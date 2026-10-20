@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gothic Duel - バトル</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap" rel="stylesheet">
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body {
+            font-family: 'EB Garamond', serif;
+            background: #090e07;
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 盤面背景 */
+        .battle-board {
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at 50% 50%, #2e4726 0%, #121c0e 65%, #080d06 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 12px 18px;
+            position: relative;
+        }
+
+        /* --- 左上：メニューボタン & 相手裏面デッキ --- */
+        .top-left-ui {
+            position: absolute; top: 12px; left: 15px; z-index: 10;
+            display: flex; gap: 15px; align-items: flex-start;
+        }
+        .btn-menu {
+            width: 44px; height: 44px; background: rgba(18, 25, 15, 0.9);
+            border: 2px solid #3c5433; border-radius: 8px; color: #a2c497;
+            font-size: 22px; cursor: pointer; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.7);
+        }
+        .enemy-deck-area { display: flex; gap: 4px; }
+        .deck-back-card {
+            width: 32px; height: 46px; background: #152212; border: 1px solid #3a5830;
+            border-radius: 3px; box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        /* 左上カード詳細パネル */
+        .card-detail-panel {
+            position: absolute; top: 65px; left: 15px; z-index: 20;
+            width: 250px; background: rgba(12, 18, 10, 0.95);
+            border: 1px solid #c9a050; border-radius: 8px; padding: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.9); display: none;
+        }
+        .detail-name { font-family: 'Cinzel Decorative', serif; color: #f1e6cf; font-size: 14px; font-weight: bold; }
+        .detail-class { font-size: 11px; color: #8ba880; margin-bottom: 6px; }
+        .detail-desc { font-size: 12px; color: #e0d8e8; margin-bottom: 10px; line-height: 1.3; }
+        
+        /* 進化（黄色）＆超進化（紫）ボタン */
+        .btn-evolve {
+            flex: 1; background: linear-gradient(135deg, #d4af37, #8a5a00);
+            border: none; color: #000; font-weight: bold; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px;
+            box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+        }
+        .btn-evolve:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; filter: grayscale(1); }
+        .btn-super-evolve {
+            flex: 1; background: linear-gradient(135deg, #a855f7, #6b21a8);
+            border: none; color: #fff; font-weight: bold; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 11px;
+            box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+        }
+        .btn-super-evolve:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; filter: grayscale(1); }
+
+        /* --- リーダー表示 --- */
+        .leader-container {
+            position: absolute; left: 50%; transform: translateX(-50%);
+            display: flex; align-items: center; justify-content: center; z-index: 5;
+        }
+        .enemy-leader { top: 8px; }
+        .my-leader { bottom: 65px; }
+
+        .leader-avatar-frame {
+            width: 90px; height: 90px; border-radius: 50%;
+            border: 3px solid #d4af37; background: #131c10;
+            display: flex; justify-content: center; align-items: center; font-size: 48px;
+            position: relative; box-shadow: 0 0 20px rgba(0,0,0,0.8), 0 0 10px rgba(212,175,55,0.4);
+        }
+
+        .badge-stat {
+            position: absolute; border-radius: 50%; font-weight: bold;
+            display: flex; justify-content: center; align-items: center; border: 2px solid #fff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        }
+        .badge-atk { left: -10px; bottom: 10px; width: 32px; height: 32px; background: radial-gradient(circle, #4a5568, #1a202c); color: #fff; font-size: 14px; }
+        .badge-hp { right: -10px; bottom: 10px; width: 38px; height: 38px; background: radial-gradient(circle, #e53e3e, #800000); color: #fff; font-size: 18px; }
+        
+        .badge-ep {
+            left: 12px; top: -10px; width: 34px; height: 34px;
+            background: radial-gradient(circle, #ffd700, #b8860b); color: #000; font-size: 15px;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+        }
+        .badge-sep {
+            right: 12px; top: -10px; width: 34px; height: 34px;
+            background: radial-gradient(circle, #c084fc, #6b21a8); color: #fff; font-size: 15px;
+            box-shadow: 0 0 12px rgba(192, 132, 252, 0.9);
+        }
+
+        /* --- 盤面 (Field Area) --- */
+        .field-area {
+            flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 25px;
+            margin-top: 50px; margin-bottom: 50px;
+        }
+        .card-row { display: flex; justify-content: center; gap: 16px; min-height: 125px; }
+        .field-card {
+            width: 90px; height: 125px; background: linear-gradient(145deg, #1c2b18, #0a1208);
+            border: 2px solid #4a6b40; border-radius: 6px; position: relative;
+            display: flex; flex-direction: column; justify-content: space-between; padding: 6px;
+            cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .field-card:hover { transform: translateY(-4px); }
+        .field-card.selected { border-color: #00f0ff !important; box-shadow: 0 0 18px #00f0ff !important; }
+
+        /* エフェクト枠 */
+        .field-card.storm { border-color: #00f0ff; box-shadow: 0 0 15px rgba(0, 240, 255, 0.9); }
+        .field-card.rush { border-color: #ffd700; box-shadow: 0 0 15px rgba(255, 215, 0, 0.9); }
+        .field-card.ward { border-color: #00ff88; box-shadow: 0 0 15px rgba(0, 255, 136, 0.8); }
+        
+        .field-card.evolved { border-color: #ffd700; box-shadow: 0 0 15px #ffd700, inset 0 0 10px rgba(255, 215, 0, 0.5); }
+        .field-card.super-evolved { border-color: #c084fc; box-shadow: 0 0 20px #c084fc, inset 0 0 12px rgba(192, 132, 252, 0.6); background: linear-gradient(145deg, #3b0764, #1e1b4b); }
+
+        .field-card.exhausted { opacity: 0.6; border-color: #3d4a39 !important; box-shadow: none !important; }
+
+        .card-atk { position: absolute; bottom: 4px; left: 6px; color: #00f0ff; font-weight: bold; font-size: 14px; text-shadow: 0 0 4px #000; }
+        .card-hp { position: absolute; bottom: 4px; right: 6px; color: #ff4d4d; font-weight: bold; font-size: 14px; text-shadow: 0 0 4px #000; }
+
+        /* --- 手札 --- */
+        .bottom-ui {
+            position: absolute; bottom: 10px; left: 0; width: 100%;
+            display: flex; justify-content: center; align-items: flex-end; z-index: 10; pointer-events: none;
+        }
+        .hand-container { display: flex; gap: -10px; justify-content: center; pointer-events: auto; padding-bottom: 5px; }
+        .hand-card {
+            width: 90px; height: 130px; background: linear-gradient(145deg, #182614, #0d170b);
+            border: 2px solid #8ba880; border-radius: 8px; padding: 6px; cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); position: relative;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6); margin: 0 2px;
+        }
+        .hand-card:hover { transform: translateY(-30px) scale(1.15); z-index: 30; border-color: #ffd700; }
+        .card-cost {
+            position: absolute; top: -6px; left: -6px; background: radial-gradient(circle, #5c96f5, #172d54); color: #fff;
+            border-radius: 50%; width: 24px; height: 24px; font-weight: bold; font-size: 13px;
+            display: flex; justify-content: center; align-items: center; border: 1px solid #fff; box-shadow: 0 2px 5px #000;
+        }
+
+        /* --- 右側：PP & ターン終了ボタン --- */
+        .right-ui-panel {
+            position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; align-items: center; gap: 12px; z-index: 10;
+        }
+        .pp-badge-box {
+            background: rgba(12, 18, 10, 0.85); border: 1px solid #3c5433; border-radius: 15px;
+            padding: 4px 14px; font-family: 'Cinzel Decorative', serif; color: #00f0ff;
+            font-size: 15px; font-weight: bold; box-shadow: 0 0 10px rgba(0,240,255,0.2);
+        }
+        .btn-turn-end-wrapper {
+            width: 105px; height: 105px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(0,240,255,0.2) 0%, rgba(0,0,0,0.8) 70%);
+            display: flex; justify-content: center; align-items: center; padding: 4px;
+        }
+        .btn-turn-end {
+            width: 95px; height: 95px; border-radius: 50%;
+            background: radial-gradient(circle, #1a5bb8 0%, #081d42 100%);
+            border: 2px solid #5c96f5; color: #ffffff; font-family: 'Cinzel Decorative', serif;
+            font-size: 15px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 0 20px rgba(92,150,245,0.7), inset 0 0 15px rgba(255,255,255,0.4);
+            transition: all 0.2s;
+        }
+        .btn-turn-end:hover { transform: scale(1.05); border-color: #fff; box-shadow: 0 0 30px rgba(0,240,255,0.9); }
+
+        .pp-lamps { display: flex; gap: 3px; margin-top: 4px; }
+        .pp-dot { width: 8px; height: 8px; border-radius: 50%; background: #1a2a16; border: 1px solid #3c5433; }
+        .pp-dot.active { background: #00f0ff; box-shadow: 0 0 6px #00f0ff; border-color: #fff; }
+
+        .left-bottom-info {
+            position: absolute; bottom: 15px; left: 15px; z-index: 10;
+            background: rgba(12, 18, 10, 0.85); border: 1px solid #3c5433;
+            border-radius: 6px; padding: 6px 12px; font-size: 12px; color: #a2c497;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+
+        .my-deck-area {
+            position: absolute; bottom: 15px; right: 140px; z-index: 10;
+            width: 50px; height: 70px; background: #152212; border: 2px solid #3a5830;
+            border-radius: 4px; box-shadow: 0 0 10px rgba(0,0,0,0.8);
+        }
+
+        .overlay-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(8px);
+            z-index: 100; display: flex; justify-content: center; align-items: center;
+        }
+        #vs-cutin-screen { display: flex; flex-direction: column; }
+        .vs-container { display: flex; align-items: center; gap: 40px; }
+        .vs-player-card { text-align: center; }
+        .vs-avatar { width: 110px; height: 110px; border-radius: 50%; border: 3px solid #c9a050; font-size: 55px; display: flex; justify-content: center; align-items: center; background: #1a1028; margin: 0 auto 10px; }
+        .vs-badge { background: linear-gradient(135deg, #c9a050, #704d08); color: #000; padding: 6px 20px; border-radius: 20px; font-weight: bold; font-size: 16px; margin-top: 10px; }
+
+        #gameset-screen { display: none; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .gameset-text { font-family: 'Cinzel Decorative', serif; font-size: 72px; color: #d4af37; text-shadow: 0 0 25px rgba(212, 175, 55, 0.8); animation: zoomIn 0.8s ease-out; }
+        @keyframes zoomIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        #result-screen { display: none; }
+        .result-panel { width: 90%; max-width: 700px; background: rgba(18, 25, 15, 0.95); border: 1px solid #c9a050; border-radius: 12px; padding: 25px; text-align: center; }
+        .result-title { font-family: 'Cinzel Decorative', serif; font-size: 48px; font-weight: bold; margin-bottom: 15px; }
+        .result-title.win { color: #ffd700; } .result-title.lose { color: #d0c4de; }
+        .score-list { text-align: left; font-size: 14px; color: #e0d8e8; line-height: 1.8; }
+        .score-row { display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .result-btns { display: flex; justify-content: center; gap: 12px; margin-top: 20px; }
+        .btn-res { padding: 10px 20px; background: #181124; border: 1px solid #6c5383; color: #f1e6cf; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-res.main-action { background: linear-gradient(135deg, #1e62d0, #0a2558); border-color: #85b3ff; color: #fff; }
+
+        #pause-menu-modal { display: none; }
+        .menu-box { background: rgba(22, 16, 35, 0.95); border: 2px solid #c9a050; border-radius: 12px; padding: 30px; width: 320px; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="battle-board">
+
+    <!-- 左上: メニューボタン & カード詳細 -->
+    <div class="top-left-ui">
+        <button class="btn-menu" onclick="openPauseMenu()">☰</button>
+        <div class="enemy-deck-area">
+            <div class="deck-back-card"></div>
+            <div class="deck-back-card"></div>
+            <div class="deck-back-card"></div>
+        </div>
+    </div>
+
+    <!-- 左上カード詳細パネル -->
+    <div id="card-detail" class="card-detail-panel">
+        <div id="detail-name" class="detail-name">カード名</div>
+        <div id="detail-class" class="detail-class">[エルフ]</div>
+        <div id="detail-desc" class="detail-desc">効果テキストがここに表示されます。</div>
+        <div style="display: flex; gap: 6px; margin-top: 8px;">
+            <button id="btn-evolve" class="btn-evolve" onclick="executeEvolution(false)">✨ 進化 (+2)</button>
+            <button id="btn-super-evolve" class="btn-super-evolve" onclick="executeEvolution(true)">🌟 超進化 (+3)</button>
+        </div>
+    </div>
+
+    <!-- 相手リーダー -->
+    <div class="leader-container enemy-leader" onclick="directAttackEnemy()" style="cursor: pointer;" title="クリックで相手リーダーに攻撃">
+        <div class="leader-avatar-frame">
+            🧝‍♀️
+            <div class="badge-stat badge-atk">3</div>
+            <div class="badge-stat badge-hp" id="enemy-hp">20</div>
+            <div class="badge-stat badge-ep">3</div>
+            <div class="badge-stat badge-sep">5</div>
+        </div>
+    </div>
+
+    <!-- フィールド (盤面) -->
+    <div class="field-area">
+        <div class="card-row" id="enemy-board"></div>
+        <div class="card-row" id="my-board"></div>
+    </div>
+
+    <!-- 自分リーダー -->
+    <div class="leader-container my-leader">
+        <div class="leader-avatar-frame">
+            🧙‍♂️
+            <div class="badge-stat badge-atk">3</div>
+            <div class="badge-stat badge-hp" id="my-hp">20</div>
+            <div class="badge-stat badge-ep" id="my-ep-val">3</div>
+            <div class="badge-stat badge-sep" id="my-sep-val">5</div>
+        </div>
+    </div>
+
+    <!-- 左下: コンボ・山札・墓地情報 -->
+    <div class="left-bottom-info">
+        <div>コンボ数: 🏹 0</div>
+        <div>🎴 34  ☠️ 0</div>
+    </div>
+
+    <!-- 右下: 自分のデッキ -->
+    <div class="my-deck-area"></div>
+
+    <!-- 下部：手札 -->
+    <div class="bottom-ui">
+        <div class="hand-container" id="my-hand"></div>
+    </div>
+
+    <!-- 右側：PP ＆ ターン終了ボタン -->
+    <div class="right-ui-panel">
+        <div class="pp-badge-box">PP 1 / 1</div>
+        <div class="btn-turn-end-wrapper">
+            <button class="btn-turn-end" onclick="endTurn()">ターン<br>終了</button>
+        </div>
+        <div class="pp-badge-box" style="margin-top: 5px;">PP <span id="current-pp">1</span> / <span id="max-pp">1</span></div>
+        <div class="pp-lamps" id="pp-lamps">
+            <div class="pp-dot active"></div>
+            <div class="pp-dot"></div><div class="pp-dot"></div><div class="pp-dot"></div><div class="pp-dot"></div>
+            <div class="pp-dot"></div><div class="pp-dot"></div><div class="pp-dot"></div><div class="pp-dot"></div><div class="pp-dot"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- 先攻・後攻決定VS画面 -->
+<div id="vs-cutin-screen" class="overlay-screen">
+    <div style="font-family: 'Cinzel Decorative', serif; color: #c9a050; font-size: 32px; margin-bottom: 30px;">
+        MATCH FOUND
+    </div>
+    <div class="vs-container">
+        <div class="vs-player-card">
+            <div class="vs-avatar">🧙‍♂️</div>
+            <div style="color: #f1e6cf; font-weight: bold;" id="vs-my-name">あなた</div>
+            <div class="vs-badge" id="my-turn-order">先攻</div>
+        </div>
+
+        <div style="font-family: 'Cinzel Decorative', serif; font-size: 48px; color: #c9a050;">VS</div>
+
+        <div class="vs-player-card">
+            <div class="vs-avatar">🧝‍♀️</div>
+            <div style="color: #f1e6cf; font-weight: bold;">相手プレイヤー</div>
+            <div class="vs-badge" id="enemy-turn-order" style="background: #4a3e56; color: #fff;">後攻</div>
+        </div>
+    </div>
+</div>
+
+<!-- GAME SET カットイン -->
+<div id="gameset-screen" class="overlay-screen">
+    <div class="gameset-text">GAME SET</div>
+</div>
+
+<!-- リザルト画面 -->
+<div id="result-screen" class="overlay-screen">
+    <div class="result-panel">
+        <div id="result-title" class="result-title win">WIN</div>
+        <div class="score-list" id="score-details"></div>
+        <div class="result-btns">
+            <button class="btn-res" onclick="location.reload()">再戦する</button>
+            <button class="btn-res main-action" onclick="location.href='home.html'">ホームへ戻る</button>
+        </div>
+    </div>
+</div>
+
+<!-- ポーズメニュー -->
+<div id="pause-menu-modal" class="overlay-screen">
+    <div class="menu-box">
+        <div style="font-family: 'Cinzel Decorative', serif; color: #c9a050; font-size: 20px; margin-bottom: 20px;">バトルメニュー</div>
+        <button class="btn-res" style="width:100%; margin-bottom:10px; background:#6b1d1d;" onclick="triggerGameSet(false)">リタイア</button>
+        <button class="btn-res" style="width:100%;" onclick="closePauseMenu()">バトルへ戻る</button>
+    </div>
+</div>
+
+<script src="js/rank_util.js"></script>
+
+<script>
+    let myHp = 20, enemyHp = 20;
+    let currentPp = 1, maxPp = 1;
+    let myEp = 3, mySep = 5;
+    let hasEvolvedThisTurn = false;
+    let selectedBoardCard = null;
+
+    let myHandCards = [
+        { id: 101, name: 'フェアリー', cost: 1, attack: 1, hp: 1, desc: '【疾走】リーダーを攻撃可能', isStorm: true },
+        { id: 102, name: 'ウォーターフェアリー', cost: 1, attack: 1, hp: 1, desc: '【突進】フォロワーを攻撃可能', isRush: true },
+        { id: 103, name: 'トレント', cost: 4, attack: 3, hp: 4, desc: '【守護】相手の攻撃を守る', isWard: true },
+        { id: 104, name: 'キャラバン', cost: 7, attack: 10, hp: 10, desc: '強力な巨大フォロワー' }
+    ];
+    let myBoardCards = [];
+    let enemyBoardCards = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const isFirst = Math.random() < 0.5;
+        document.getElementById('my-turn-order').innerText = isFirst ? '先攻' : '後攻';
+        document.getElementById('enemy-turn-order').innerText = isFirst ? '後攻' : '先攻';
+
+        setTimeout(() => {
+            document.getElementById('vs-cutin-screen').style.display = 'none';
+        }, 2500);
+
+        renderAll();
+    });
+
+    function renderAll() {
+        document.getElementById('my-hp').innerText = myHp;
+        document.getElementById('enemy-hp').innerText = enemyHp;
+        document.getElementById('current-pp').innerText = currentPp;
+        document.getElementById('max-pp').innerText = maxPp;
+        document.getElementById('my-ep-val').innerText = myEp;
+        document.getElementById('my-sep-val').innerText = mySep;
+
+        // PPインジケーター更新
+        const lamps = document.querySelectorAll('#pp-lamps .pp-dot');
+        lamps.forEach((lamp, idx) => {
+            if (idx < currentPp) lamp.classList.add('active');
+            else lamp.classList.remove('active');
+        });
+
+        // 手札描画
+        const handEl = document.getElementById('my-hand');
+        handEl.innerHTML = '';
+        myHandCards.forEach((card, idx) => {
+            const el = document.createElement('div');
+            el.className = 'hand-card';
+            el.onclick = () => playCard(idx);
+            el.innerHTML = `
+                <div class="card-cost">${card.cost}</div>
+                <div style="font-size: 11px; font-weight: bold; margin-top: 18px; color: #f1e6cf; text-align:center;">${card.name}</div>
+                <div style="font-size: 12px; color: #00f0ff; position: absolute; bottom: 4px; left: 6px; font-weight:bold;">⚔${card.attack}</div>
+                <div style="font-size: 12px; color: #ff4d4d; position: absolute; bottom: 4px; right: 6px; font-weight:bold;">❤${card.hp}</div>
+            `;
+            handEl.appendChild(el);
+        });
+
+        // 自分盤面描画
+        const myBoardEl = document.getElementById('my-board');
+        myBoardEl.innerHTML = '';
+        myBoardCards.forEach((card) => {
+            const el = document.createElement('div');
+            let classes = ['field-card'];
+            
+            if (card.hasAttacked) {
+                classes.push('exhausted'); // 攻撃済み個体はグレーアウト
+            } else {
+                if (card.isSuperEvolved) classes.push('super-evolved');
+                else if (card.isEvolved) classes.push('evolved');
+
+                if (card.isStorm || card.canAttackLeader) {
+                    classes.push('storm'); // 青枠：攻撃可能
+                } else if (card.isRush) {
+                    classes.push('rush');  // 黄枠：突進
+                }
+            }
+
+            if (card.isWard) classes.push('ward');
+            if (selectedBoardCard && selectedBoardCard.instanceId === card.instanceId) {
+                classes.push('selected');
+            }
+
+            el.className = classes.join(' ');
+            el.onclick = () => selectMyBoardCard(card);
+            el.innerHTML = `
+                <div style="font-size: 11px; font-weight: bold; color: #f1e6cf; text-align:center;">${card.name}</div>
+                <div class="card-atk">⚔ ${card.attack}</div>
+                <div class="card-hp">❤ ${card.hp}</div>
+            `;
+            myBoardEl.appendChild(el);
+        });
+
+        // 相手盤面描画
+        const enemyBoardEl = document.getElementById('enemy-board');
+        enemyBoardEl.innerHTML = '';
+        enemyBoardCards.forEach((card, idx) => {
+            const el = document.createElement('div');
+            el.className = 'field-card';
+            el.onclick = () => attackEnemyCard(idx);
+            el.innerHTML = `
+                <div style="font-size: 11px; font-weight: bold; color: #f1e6cf; text-align:center;">${card.name}</div>
+                <div class="card-atk">⚔ ${card.attack}</div>
+                <div class="card-hp">❤ ${card.hp}</div>
+            `;
+            enemyBoardEl.appendChild(el);
+        });
+    }
+
+    // ★ カードを出す時に唯一の instanceId を動的発行
+    function playCard(index) {
+        const handCard = myHandCards[index];
+        if (currentPp < handCard.cost) return alert('PPが足りません！');
+
+        currentPp -= handCard.cost;
+
+        // ★ ディープコピー ＆ 一元識別用の instanceId を付与
+        const boardCard = {
+            ...handCard,
+            instanceId: 'inst_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+            canAttackLeader: handCard.isStorm ? true : false,
+            hasAttacked: false
+        };
+
+        myBoardCards.push(boardCard);
+        myHandCards.splice(index, 1);
+        renderAll();
+    }
+
+    function selectMyBoardCard(card) {
+        if (card.hasAttacked) {
+            alert('このフォロワーは今ターン既に攻撃済みです！');
+            return;
+        }
+
+        selectedBoardCard = card;
+        const detailPanel = document.getElementById('card-detail');
+        detailPanel.style.display = 'block';
+        document.getElementById('detail-name').innerText = card.name;
+        document.getElementById('detail-desc').innerText = card.desc || '効果なし';
+
+        const btnEvolve = document.getElementById('btn-evolve');
+        const btnSuper = document.getElementById('btn-super-evolve');
+
+        if (hasEvolvedThisTurn || card.isEvolved || card.isSuperEvolved) {
+            btnEvolve.disabled = true;
+            btnSuper.disabled = true;
+        } else {
+            btnEvolve.disabled = false;
+            btnSuper.disabled = false;
+        }
+
+        renderAll();
+    }
+
+    function executeEvolution(isSuper) {
+        if (!selectedBoardCard) return;
+
+        if (hasEvolvedThisTurn) {
+            return alert('進化は1ターンに1回しか行えません！');
+        }
+
+        if (isSuper) {
+            if (mySep <= 0) return alert('超進化ポイント(SEP)が足りません！');
+            mySep--;
+            selectedBoardCard.isSuperEvolved = true;
+            selectedBoardCard.attack += 3; selectedBoardCard.hp += 3;
+            selectedBoardCard.name = '🌟 ' + selectedBoardCard.name;
+        } else {
+            if (myEp <= 0) return alert('進化ポイント(EP)が足りません！');
+            myEp--;
+            selectedBoardCard.isEvolved = true;
+            selectedBoardCard.attack += 2; selectedBoardCard.hp += 2;
+        }
+
+        selectedBoardCard.isRush = true;
+        hasEvolvedThisTurn = true;
+
+        document.getElementById('card-detail').style.display = 'none';
+        renderAll();
+    }
+
+    function attackEnemyCard(enemyIdx) {
+        if (!selectedBoardCard) return;
+        if (selectedBoardCard.hasAttacked) return alert('このフォロワーは既に攻撃済みです！');
+
+        const enemyCard = enemyBoardCards[enemyIdx];
+        enemyCard.hp -= selectedBoardCard.attack;
+        selectedBoardCard.hp -= enemyCard.attack;
+
+        selectedBoardCard.hasAttacked = true; // 該当個体のみ攻撃済みに変更
+
+        if (enemyCard.hp <= 0) enemyBoardCards.splice(enemyIdx, 1);
+        if (selectedBoardCard.hp <= 0) {
+            const myIdx = myBoardCards.findIndex(c => c.instanceId === selectedBoardCard.instanceId);
+            if (myIdx >= 0) myBoardCards.splice(myIdx, 1);
+        }
+
+        selectedBoardCard = null;
+        document.getElementById('card-detail').style.display = 'none';
+        renderAll();
+    }
+
+    function directAttackEnemy() {
+        if (!selectedBoardCard) return alert('攻撃するフォロワーを選択してください！');
+        if (selectedBoardCard.hasAttacked) return alert('このフォロワーは既に攻撃済みです！');
+
+        if (!selectedBoardCard.canAttackLeader && !selectedBoardCard.isStorm) {
+            return alert('召喚酔い中または突進のため、このターンはリーダーを攻撃できません！');
+        }
+
+        enemyHp = Math.max(0, enemyHp - selectedBoardCard.attack);
+        selectedBoardCard.hasAttacked = true; // 該当個体のみ攻撃済みに変更
+
+        selectedBoardCard = null;
+        document.getElementById('card-detail').style.display = 'none';
+        renderAll();
+
+        if (enemyHp <= 0) triggerGameSet(true);
+    }
+
+    function triggerGameSet(isWin) {
+        closePauseMenu();
+        document.getElementById('gameset-screen').style.display = 'flex';
+        setTimeout(() => {
+            document.getElementById('gameset-screen').style.display = 'none';
+            showResultScreen(isWin);
+        }, 2000);
+    }
+
+    function showResultScreen(isWin) {
+        document.getElementById('result-screen').style.display = 'flex';
+        let user = JSON.parse(localStorage.getItem('user') || '{"username": "プレイヤー", "mp": 0, "winStreak": 0}');
+        if (isWin) user.winStreak = (user.winStreak || 0) + 1;
+        else user.winStreak = 0;
+
+        const groupInfo = typeof getGroupInfo === 'function' ? getGroupInfo(user.winStreak) : { name: 'エメラルド', mpBonus: 100, color: '#48bb78', icon: '🟢' };
+        let earnedMp = isWin ? groupInfo.mpBonus : 0;
+        user.mp = (user.mp || 0) + earnedMp;
+        localStorage.setItem('user', JSON.stringify(user));
+
+        const rankInfo = typeof getRankInfo === 'function' ? getRankInfo(user.mp) : { name: 'Beginner 0', nextMp: 200 };
+        document.getElementById('result-title').innerText = isWin ? 'WIN' : 'RESULT';
+        document.getElementById('score-details').innerHTML = `
+            <div class="score-row"><span>所属グループ</span><span style="color:${groupInfo.color}">${groupInfo.icon} ${groupInfo.name}</span></div>
+            <div class="score-row"><span>勝利報酬</span><span style="color:#ffd700;">+${earnedMp} MP</span></div>
+            <div class="score-row"><span>現在のランク</span><span>${rankInfo.name} (${user.mp} MP)</span></div>
+        `;
+    }
+
+    function endTurn() {
+        if (maxPp < 10) maxPp++;
+        currentPp = maxPp;
+        hasEvolvedThisTurn = false;
+
+        myBoardCards.forEach(card => {
+            card.canAttackLeader = true;
+            card.hasAttacked = false;
+        });
+
+        // テスト用ドロー（同名カード「フェアリー」を補充）
+        myHandCards.push({ id: 101, name: 'フェアリー', cost: 1, attack: 1, hp: 1, desc: '【疾走】リーダーを攻撃可能', isStorm: true });
+        renderAll();
+    }
+
+    function openPauseMenu() { document.getElementById('pause-menu-modal').style.display = 'flex'; }
+    function closePauseMenu() { document.getElementById('pause-menu-modal').style.display = 'none'; }
+</script>
+
+</body>
+</html>
